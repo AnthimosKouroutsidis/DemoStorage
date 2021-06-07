@@ -1,80 +1,155 @@
 package com.example.demostorage.DemoStorage;
 
+import com.google.gson.Gson;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistry;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.hibernate.query.Query;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class Storage {
 
     private final long maxCapacity;
-    private final AtomicLong capacity;
-    private final HashMap<String, StorageItem> storage;
-    private final AtomicLong counter;
+
+    private static SessionFactory sessionFactory;
 
     public Storage(int capacity) {
         this.maxCapacity = capacity;
-        this.storage = new HashMap<String, StorageItem>();
 
-        this.counter = new AtomicLong();
-        this.capacity = new AtomicLong();
+        StandardServiceRegistry ssr = new StandardServiceRegistryBuilder().configure().build();
+        sessionFactory = new MetadataSources(ssr).buildMetadata().buildSessionFactory();
     }
     public Storage() {
         this(4);
     }
 
     public StorageItem getItem(String key) throws Exception {
-        if (storage.containsKey(key)) {
-            return storage.get(key);
+
+        Session session = sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        Query query = session.createQuery("FROM StorageItem WHERE item_key = :key");
+        query.setParameter("key", key);
+        List results = query.list();
+
+        transaction.commit();
+        session.close();
+
+        if (results.size() > 0) {
+            return (StorageItem) results.get(0);
         } else {
             throw new Exception("Storage with key " + key + " doesn't exist.");
         }
     }
 
+    public boolean hasItem(String key) {
+        Session session = sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        Query query = session.createQuery("FROM StorageItem WHERE item_key = :key");
+        query.setParameter("key", key);
+        List results = query.list();
+
+        transaction.commit();
+        session.close();
+
+        return results.size() > 0;
+    }
+
     public void setItem(String key, HashMap<String, Object> content) throws Exception {
-        StorageItem item = new StorageItem(counter.incrementAndGet(), content);
+        Gson gson = new Gson();
+        String json = gson.toJson(content);
+        StorageItem item = new StorageItem(key, json);
         long itemCapacityIncrement = item.getSize();
 
-        // item exists already, so subtract its current size
-        if (storage.containsKey(key)) {
-            itemCapacityIncrement -= storage.get(key).getSize();
+        boolean itemExists = false;
+        if (hasItem(key)) {
+            itemExists = true;
+            // item exists already, so subtract its current size
+            itemCapacityIncrement -= getItem(key).getSize();
         }
 
-        long neededCapacity = this.capacity.get() + itemCapacityIncrement;
+        long neededCapacity = getUsedCapacity() + itemCapacityIncrement;
         if (neededCapacity > this.maxCapacity) {
-            // hack: since the version counter gets incremented at the beginning of this function, we have to undo
-            // that change
-            counter.decrementAndGet();
             throw new Exception("Not enough capacity to store the item (" + neededCapacity + " needed, " +
                     this.maxCapacity + " available).");
         }
 
-        this.capacity.addAndGet(itemCapacityIncrement);
-        storage.put(key, item);
+        Session session = sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        if (itemExists) {
+            Query query = session.createQuery("DELETE FROM StorageItem WHERE item_key = :key");
+            query.setParameter("key", key);
+            query.executeUpdate();
+        }
+
+        session.save(item);
+
+        transaction.commit();
+        session.close();
     }
 
     public long getVersion() {
-        return counter.get();
+        return 0; // in order to track changes persistently, an option would be to use database triggers
     }
 
     public List<String> getItemList() {
-        return new ArrayList<String>(storage.keySet());
+        List<String> items = new ArrayList<String>();
+
+        Session session = sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        Query query = session.createQuery("FROM StorageItem");
+        List result = query.list();
+        for ( StorageItem item : (List<StorageItem>) result ) {
+            items.add(item.getKey());
+        }
+
+        transaction.commit();
+        session.close();
+
+        return items;
     }
 
     public void deleteItem(String key) {
         // free up the capacity of the item, if it exists
-        if (storage.containsKey(key)) {
-            long itemCapacityIncrement = -storage.get(key).getSize();
-            this.capacity.getAndAdd(itemCapacityIncrement);
+        StorageItem item;
+        try {
+            item = getItem(key);
 
-            storage.remove(key);
-
-            // the data has changed, so increment the version counter
-            counter.incrementAndGet();
+        } catch (Exception e) {
+            // item does not exist
+            return;
         }
+
+        Session session = sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        session.delete(item);
+
+        session.close();
+        transaction.commit();
     }
 
     public long getAvailableCapacity() {
-        return this.maxCapacity - this.capacity.get();
+        return this.maxCapacity - getUsedCapacity();
+    }
+
+    private long getUsedCapacity() {
+        Session session = sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        Query query = session.createQuery("SELECT sum(size) FROM StorageItem");
+        List result = query.list();
+        transaction.commit();
+        session.close();
+        return (long) result.get(0);
     }
 }

@@ -20,6 +20,11 @@ public class DemoStorageApplication {
 		SpringApplication.run(DemoStorageApplication.class, args);
 	}
 
+	@RequestMapping("/storage/")
+	public ResponseEntity<?> requestStorageItem() {
+		return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+	}
+
 	@GetMapping("/storage/{key}")
 	public ResponseEntity<?> getStorageItem(@PathVariable("key") String key) {
 		try {

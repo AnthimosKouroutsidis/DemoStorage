@@ -134,8 +134,8 @@ public class Storage {
 
         session.delete(item);
 
-        session.close();
         transaction.commit();
+        session.close();
     }
 
     public long getAvailableCapacity() {
@@ -148,8 +148,10 @@ public class Storage {
 
         Query query = session.createQuery("SELECT sum(size) FROM StorageItem");
         List result = query.list();
+
         transaction.commit();
         session.close();
+
         return (long) result.get(0);
     }
 }

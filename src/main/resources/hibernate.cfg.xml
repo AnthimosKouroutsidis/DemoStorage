@@ -15,7 +15,7 @@
 
         <!-- Database connection settings -->
         <property name="connection.driver_class">com.mysql.cj.jdbc.Driver</property>
-        <property name="connection.url">jdbc:mysql://localhost/hibernate?serverTimezone=Europe/Berlin&amp;useSSL=false</property>
+        <property name="connection.url">jdbc:mysql://db/hibernate?serverTimezone=Europe/Berlin&amp;useSSL=false</property>
         <property name="connection.username">root</property>
         <property name="connection.password">password</property>
 

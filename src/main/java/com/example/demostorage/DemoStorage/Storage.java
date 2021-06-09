@@ -152,6 +152,11 @@ public class Storage {
         transaction.commit();
         session.close();
 
+        // in case there are no items yet, the sum will be null
+        if (result == null || result.get(0) == null) {
+            return 0;
+        }
+
         return (long) result.get(0);
     }
 }

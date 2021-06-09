@@ -1,0 +1,29 @@
+version: "3.7"
+
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - test-mysql-data:/var/lib/mysql
+    networks:
+      - backend
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: hibernate
+
+  demo-storage:
+    container_name: springboot-demostorage
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - backend
+    image: springboot-demostorage:latest
+    ports:
+      - 18888:8080
+
+networks:
+  backend:
+
+volumes:
+  test-mysql-data:

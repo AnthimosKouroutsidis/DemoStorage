@@ -1,5 +1,7 @@
 Run this to install:
 
-`cd DemoStorage`
-
-`docker-compose -f ./docker-compose.yaml up -d`
+```
+git clone https://github.com/AnthimosKouroutsidis/DemoStorage.git
+cd DemoStorage
+docker-compose -f ./docker-compose.yaml up -d
+```
